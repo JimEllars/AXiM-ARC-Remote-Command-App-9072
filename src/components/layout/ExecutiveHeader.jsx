@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 
-const { FiBell, FiPower, FiRadio, FiRefreshCw } = FiIcons;
+const { FiBell, FiBellOff, FiPower, FiRadio, FiRefreshCw } = FiIcons;
 
 function ExecutiveHeader({
   queueCount,
@@ -10,6 +10,21 @@ function ExecutiveHeader({
   onRecovery,
   onNotifications
 }) {
+  const [pushEnabled, setPushEnabled] = useState(false);
+
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      setPushEnabled(true);
+    }
+  }, []);
+
+  const handlePushToggle = async () => {
+    await onNotifications();
+    if ('Notification' in window && Notification.permission === 'granted') {
+      setPushEnabled(true);
+    }
+  };
+
   return (
     <header className="executive-header">
       <div className="header-brand">
@@ -23,11 +38,12 @@ function ExecutiveHeader({
       <div className="header-actions">
         <button
           type="button"
-          className="icon-button"
-          onClick={onNotifications}
-          aria-label="Enable notifications"
+          className={`icon-button ${pushEnabled ? 'active' : ''}`}
+          onClick={handlePushToggle}
+          aria-label={pushEnabled ? 'Notifications enabled' : 'Enable notifications'}
+          title={pushEnabled ? '🔔 Enabled' : '🔕 Disabled'}
         >
-          <SafeIcon icon={FiBell} />
+          <SafeIcon icon={pushEnabled ? FiBell : FiBellOff} />
           {queueCount > 0 && <b>{queueCount}</b>}
         </button>
         <button

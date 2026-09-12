@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useCommandHistory } from './useCommandHistory';
 import { getLocalOnyxResponse } from '../services/localDemoData';
 
-const ONYX_URL = import.meta.env.VITE_ONYX_BRIDGE_URL;
+const ONYX_URL = import.meta.env.VITE_ONYX_BRIDGE_URL || 'https://onyx-bridge.axim.us.com';
 
 function wait(milliseconds) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -68,14 +68,14 @@ export function useOnyxStream(previewMode = false) {
     setIsStreaming(true);
 
     try {
-      const output = previewMode || !ONYX_URL
+      const output = previewMode
         ? await streamLocalResponse(cleanPrompt, setTokens)
         : await streamRemoteResponse(cleanPrompt, setTokens);
 
       commandHistory.addEntry({
         command: cleanPrompt,
         result: output,
-        status: previewMode || !ONYX_URL ? 'preview' : 'success'
+        status: previewMode ? 'preview' : 'success'
       });
     } catch (streamError) {
       setError(streamError.message);
@@ -89,12 +89,17 @@ export function useOnyxStream(previewMode = false) {
     }
   };
 
-  const dispatchVoice = async (audioBlob) => {
-    if (!audioBlob || isStreaming || isTranscribing) return;
+  const dispatchVoice = async (audioData) => {
+    if (!audioData || isStreaming || isTranscribing) return;
 
-    if (previewMode || !ONYX_URL) {
+    if (previewMode) {
       setTokens('Local mode: voice dispatch requires a connected Onyx Edge Bridge.');
       return;
+    }
+
+    if (typeof audioData === 'string') {
+        // Fallback Web Speech API sent text directly
+        return dispatchPrompt(audioData);
     }
 
     setTokens('');
@@ -103,10 +108,12 @@ export function useOnyxStream(previewMode = false) {
 
     try {
       const body = new FormData();
-      body.append('audio', audioBlob, 'arc-command.webm');
+      body.append('audio', audioData, 'arc-command.webm');
       body.append('source', 'remote_companion');
 
-      const response = await fetch('/api/remote/voice/transcribe', {
+      // The instruction specifies streaming audio directly to onyx-bridge,
+      // but the existing code used /api/remote/voice/transcribe. Let's update it.
+      const response = await fetch(`${ONYX_URL}/api/v1/transcribe`, {
         method: 'POST',
         credentials: 'include',
         body

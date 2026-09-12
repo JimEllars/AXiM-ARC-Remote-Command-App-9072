@@ -40,6 +40,14 @@ function AppShell({ previewMode, onExitPreview }) {
   const circuitBreaker = useCircuitBreakerState(previewMode);
 
   useEffect(() => {
+    const handleOfflineSync = (e) => {
+      showToast(`Synced ${e.detail} queued action${e.detail > 1 ? 's' : ''}.`, 'success');
+    };
+    window.addEventListener('arc-offline-sync-complete', handleOfflineSync);
+    return () => window.removeEventListener('arc-offline-sync-complete', handleOfflineSync);
+  }, []);
+
+  useEffect(() => {
     if (!toast) return undefined;
 
     const timer = window.setTimeout(() => setToast(null), 4200);
@@ -94,19 +102,31 @@ function AppShell({ previewMode, onExitPreview }) {
         return;
       }
 
+      const payload = {
+          task_id: item.id,
+          decision,
+          source_app: item.source_app,
+          action_payload: item.action_payload,
+          comment: comment || 'Resolved via AXiM Executive Remote'
+      };
+
+      if (!navigator.onLine) {
+          const cached = JSON.parse(localStorage.getItem('arc_offline_actions') || '[]');
+          cached.push(payload);
+          localStorage.setItem('arc_offline_actions', JSON.stringify(cached));
+          updateQueueAfterResolution([item.id]);
+          setConfirmingAction(null);
+          showToast('Offline: Action queued for automatic delivery.', 'info');
+          return;
+      }
+
       const response = await fetch('/api/remote/hitl-resolve', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          task_id: item.id,
-          decision,
-          source_app: item.source_app,
-          action_payload: item.action_payload,
-          comment: comment || 'Resolved via AXiM Executive Remote'
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -126,7 +146,23 @@ function AppShell({ previewMode, onExitPreview }) {
         'success'
       );
     } catch (error) {
-      showToast(error.message, 'error');
+      if (!navigator.onLine || error.message.includes('Failed to fetch')) {
+          const payload = {
+              task_id: item.id,
+              decision,
+              source_app: item.source_app,
+              action_payload: item.action_payload,
+              comment: comment || 'Resolved via AXiM Executive Remote'
+          };
+          const cached = JSON.parse(localStorage.getItem('arc_offline_actions') || '[]');
+          cached.push(payload);
+          localStorage.setItem('arc_offline_actions', JSON.stringify(cached));
+          updateQueueAfterResolution([item.id]);
+          setConfirmingAction(null);
+          showToast('Offline: Action queued for automatic delivery.', 'info');
+      } else {
+          showToast(error.message, 'error');
+      }
     } finally {
       setSubmittingAction(false);
     }

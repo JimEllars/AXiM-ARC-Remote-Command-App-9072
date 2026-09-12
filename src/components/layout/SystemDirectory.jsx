@@ -19,7 +19,7 @@ const {
 
 const systems = [
   {
-    name: 'Executive Remote',
+    name: 'AXiM Core',
     category: 'Command center',
     description: 'Telemetry, action approvals, emergency controls, and executive command.',
     status: 'Primary',
@@ -27,47 +27,11 @@ const systems = [
     tone: 'yellow',
     activity: '6 actions awaiting review',
     icon: FiCommand,
-    url: '/#',
-    external: false
-  },
-  {
-    name: 'Coding Lab',
-    category: 'Engineering',
-    description: 'Manage repositories, pull requests, deployments, and release workflows.',
-    status: 'Operational',
-    statusTone: 'online',
-    tone: 'blue',
-    activity: '2 pull requests require review',
-    icon: FiCode,
-    url: 'https://coding.axim.us.com',
+    url: 'https://core.axim.us.com?source=arc',
     external: true
   },
   {
-    name: 'Core Relay',
-    category: 'Infrastructure',
-    description: 'Monitor event routing, queues, retries, and service-to-service delivery.',
-    status: 'Operational',
-    statusTone: 'online',
-    tone: 'green',
-    activity: '3 dead-letter events',
-    icon: FiActivity,
-    url: 'https://relay.axim.us.com',
-    external: true
-  },
-  {
-    name: 'Onyx',
-    category: 'Intelligence',
-    description: 'Access the cognitive command bridge and operational intelligence workflows.',
-    status: 'Connected',
-    statusTone: 'online',
-    tone: 'purple',
-    activity: 'Ready for command',
-    icon: FiBox,
-    url: '/#onyx',
-    external: false
-  },
-  {
-    name: 'Passport',
+    name: 'AXiM Passport SSO',
     category: 'Identity',
     description: 'Manage secure sessions, authorized users, and hardware-bound access.',
     status: 'Protected',
@@ -75,23 +39,23 @@ const systems = [
     tone: 'slate',
     activity: 'Session verified',
     icon: FiShield,
-    url: 'https://passport.axim.us.com',
+    url: 'https://passport.axim.us.com?source=arc',
     external: true
   },
   {
-    name: 'Vault',
-    category: 'Data operations',
-    description: 'Review governed data services, audit activity, and operational records.',
-    status: 'Operational',
+    name: 'Onyx AI Cockpit',
+    category: 'Intelligence',
+    description: 'Access the cognitive command bridge and operational intelligence workflows.',
+    status: 'Connected',
     statusTone: 'online',
-    tone: 'teal',
-    activity: 'Last sync 2 min ago',
-    icon: FiDatabase,
-    url: 'https://vault.axim.us.com',
+    tone: 'purple',
+    activity: 'Ready for command',
+    icon: FiBox,
+    url: 'https://onyx.axim.us.com?source=arc',
     external: true
   },
   {
-    name: 'People Ops',
+    name: 'AXiM Support System',
     category: 'Internal systems',
     description: 'Open workforce operations, permissions, and internal administration.',
     status: 'Operational',
@@ -99,7 +63,79 @@ const systems = [
     tone: 'orange',
     activity: 'No pending requests',
     icon: FiUsers,
-    url: 'https://people.axim.us.com',
+    url: 'https://support.axim.us.com?source=arc',
+    external: true
+  },
+  {
+    name: 'AXiM Coding Lab',
+    category: 'Engineering',
+    description: 'Manage repositories, pull requests, deployments, and release workflows.',
+    status: 'Operational',
+    statusTone: 'online',
+    tone: 'blue',
+    activity: '2 pull requests require review',
+    icon: FiCode,
+    url: 'https://coder.axim.us.com?source=arc',
+    external: true
+  },
+  {
+    name: 'Green Machine',
+    category: 'Infrastructure',
+    description: 'Monitor event routing, queues, retries, and service-to-service delivery.',
+    status: 'Operational',
+    statusTone: 'online',
+    tone: 'green',
+    activity: '3 dead-letter events',
+    icon: FiActivity,
+    url: 'https://greenmachine.axim.us.com?source=arc',
+    external: true
+  },
+  {
+    name: 'Mesh Network',
+    category: 'Infrastructure',
+    description: 'Review governed data services, audit activity, and operational records.',
+    status: 'Operational',
+    statusTone: 'online',
+    tone: 'teal',
+    activity: 'Last sync 2 min ago',
+    icon: FiDatabase,
+    url: 'https://mesh.axim.us.com?source=arc',
+    external: true
+  },
+  {
+    name: 'VendOS Fleet OS',
+    category: 'Infrastructure',
+    description: 'Manage vending systems.',
+    status: 'Operational',
+    statusTone: 'online',
+    tone: 'blue',
+    activity: 'Fleet operational',
+    icon: FiGrid,
+    url: 'https://vendos.axim.us.com?source=arc',
+    external: true
+  },
+  {
+    name: 'Voice Core Hub',
+    category: 'Infrastructure',
+    description: 'Manage communications.',
+    status: 'Operational',
+    statusTone: 'online',
+    tone: 'purple',
+    activity: 'Hub running',
+    icon: FiActivity,
+    url: 'https://voice.axim.us.com?source=arc',
+    external: true
+  },
+  {
+    name: 'Asguard SOC Sentinel',
+    category: 'Infrastructure',
+    description: 'Security and operations.',
+    status: 'Operational',
+    statusTone: 'online',
+    tone: 'red',
+    activity: 'SOC secure',
+    icon: FiShield,
+    url: 'https://asguard.axim.us.com?source=arc',
     external: true
   }
 ];

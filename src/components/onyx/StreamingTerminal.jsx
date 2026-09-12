@@ -1,89 +1,89 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import CommandHistory from './CommandHistory';
 import CommandTemplates from './CommandTemplates';
 import VoiceCommandButton from './VoiceCommandButton';
 
-const { FiArrowUp, FiCommand, FiLoader } = FiIcons;
+const { FiChevronRight, FiLoader, FiTerminal } = FiIcons;
 
 function StreamingTerminal({ onyx, previewMode }) {
   const [prompt, setPrompt] = useState('');
+  const terminalRef = useRef(null);
 
-  const busy = onyx.isStreaming || onyx.isTranscribing;
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [onyx.tokens]);
 
-  const submit = (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault();
     onyx.dispatchPrompt(prompt);
     setPrompt('');
   };
 
-  const selectTemplate = (command) => {
-    setPrompt(command);
+  const handleTemplate = (template) => {
+    setPrompt(template);
   };
 
-  const handleRecording = (audio) => {
-    onyx.dispatchVoice(audio);
+  const handleVoice = (audioOrText) => {
+    onyx.dispatchVoice(audioOrText);
   };
 
   return (
-    <>
-      <section className="terminal">
-        <div className="terminal-bar">
-          <span><i /> ONYX EDGE BRIDGE</span>
-          <small>
-            {onyx.isTranscribing
-              ? 'TRANSCRIBING'
-              : onyx.isStreaming
-                ? 'STREAMING'
-                : 'READY'}
-          </small>
-        </div>
+    <section className="onyx-terminal">
+      <div className="terminal-display" ref={terminalRef}>
+        {!onyx.tokens && !onyx.isStreaming && !onyx.isTranscribing ? (
+          <div className="terminal-empty">
+            <SafeIcon icon={FiTerminal} />
+            <span>Onyx is listening. Issue a command or select a template.</span>
+          </div>
+        ) : (
+          <div className="terminal-stream">
+            {onyx.isTranscribing && (
+              <span className="transcribing-indicator">
+                <SafeIcon icon={FiLoader} className="spin" /> Transcribing audio...
+              </span>
+            )}
+            {onyx.tokens}
+            {onyx.isStreaming && <i className="cursor" />}
+          </div>
+        )}
+      </div>
 
-        <div className="terminal-output">
-          <p className="terminal-system">
-            ARC secure channel initialized.<br />
-            Awaiting executive instruction<span className="cursor">_</span>
-          </p>
-          {onyx.tokens && <p className="terminal-response">{onyx.tokens}</p>}
-          {onyx.error && <p className="terminal-error">{onyx.error}</p>}
-        </div>
+      {onyx.error && <div className="inline-error">{onyx.error}</div>}
 
-        <form className="command-form" onSubmit={submit}>
-          <SafeIcon icon={FiCommand} />
+      <div className="terminal-controls">
+        <form onSubmit={handleSubmit}>
+          <SafeIcon icon={FiChevronRight} />
           <input
+            type="text"
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder="Enter a command…"
-            aria-label="Command"
-            disabled={busy}
+            placeholder="Instruct Onyx..."
+            disabled={onyx.isStreaming || onyx.isTranscribing}
+            autoComplete="off"
+            aria-label="Onyx command input"
           />
-          <button
-            type="submit"
-            disabled={!prompt.trim() || busy}
-            aria-label="Dispatch command"
-          >
-            <SafeIcon icon={onyx.isStreaming ? FiLoader : FiArrowUp} />
-          </button>
         </form>
 
         <VoiceCommandButton
-          disabled={previewMode || busy}
-          onRecording={handleRecording}
+          disabled={onyx.isStreaming || onyx.isTranscribing}
+          onRecording={handleVoice}
           onError={onyx.setError}
         />
-      </section>
+      </div>
 
-      <CommandTemplates
-        disabled={busy}
-        onSelect={selectTemplate}
-      />
+      <CommandTemplates onSelect={handleTemplate} />
 
-      <CommandHistory
-        history={onyx.history}
-        onClear={onyx.clearHistory}
-      />
-    </>
+      {onyx.history.length > 0 && (
+        <CommandHistory
+          history={onyx.history}
+          onClear={onyx.clearHistory}
+        />
+      )}
+    </section>
   );
 }
 
