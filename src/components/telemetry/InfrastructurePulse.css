@@ -1,0 +1,16 @@
+.pulse-row-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pulse-row-button:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.pulse-row-button:focus-visible {
+  border-radius: 8px;
+}

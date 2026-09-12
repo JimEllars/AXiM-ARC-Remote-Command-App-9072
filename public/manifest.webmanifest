@@ -1,0 +1,21 @@
+{
+  "name": "AXiM Executive Remote",
+  "short_name": "AXiM Remote",
+  "description": "Secure executive control plane for the AXiM ecosystem.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0D14",
+  "theme_color": "#0A0D14",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
