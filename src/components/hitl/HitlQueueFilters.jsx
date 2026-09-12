@@ -5,15 +5,31 @@ import './HitlQueueFilters.css';
 
 const { FiFilter, FiSearch, FiX } = FiIcons;
 
-function HitlQueueFilters({ filters, sources, onChange, resultCount, totalCount }) {
-  const hasFilters = filters.query || filters.priority !== 'all' || filters.source !== 'all';
+function HitlQueueFilters({
+  filters,
+  sources,
+  priorityCounts,
+  onChange,
+  resultCount,
+  totalCount
+}) {
+  const hasFilters =
+    filters.query ||
+    filters.priority !== 'all' ||
+    filters.source !== 'all' ||
+    filters.sort !== 'newest';
 
   const updateFilter = (key, value) => {
     onChange({ ...filters, [key]: value });
   };
 
   const clearFilters = () => {
-    onChange({ query: '', priority: 'all', source: 'all' });
+    onChange({
+      query: '',
+      priority: 'all',
+      source: 'all',
+      sort: 'newest'
+    });
   };
 
   return (
@@ -39,36 +55,69 @@ function HitlQueueFilters({ filters, sources, onChange, resultCount, totalCount 
         <input
           value={filters.query}
           onChange={(event) => updateFilter('query', event.target.value)}
-          placeholder="Search actions"
+          placeholder="Search actions, systems, or summaries"
           aria-label="Search actions"
         />
+        {filters.query && (
+          <button
+            type="button"
+            className="search-clear"
+            onClick={() => updateFilter('query', '')}
+            aria-label="Clear action search"
+          >
+            <SafeIcon icon={FiX} />
+          </button>
+        )}
       </label>
 
       <div className="hitl-filter-row">
-        <select
-          value={filters.priority}
-          onChange={(event) => updateFilter('priority', event.target.value)}
-          aria-label="Filter by priority"
-        >
-          <option value="all">All priorities</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-
-        <select
-          value={filters.source}
-          onChange={(event) => updateFilter('source', event.target.value)}
-          aria-label="Filter by source"
-        >
-          <option value="all">All systems</option>
-          {sources.map((source) => (
-            <option value={source} key={source}>
-              {source}
+        <label>
+          <span>Priority</span>
+          <select
+            value={filters.priority}
+            onChange={(event) => updateFilter('priority', event.target.value)}
+            aria-label="Filter by priority"
+          >
+            <option value="all">All priorities</option>
+            <option value="critical">
+              Critical ({priorityCounts.critical || 0})
             </option>
-          ))}
-        </select>
+            <option value="high">High ({priorityCounts.high || 0})</option>
+            <option value="medium">
+              Medium ({priorityCounts.medium || 0})
+            </option>
+            <option value="low">Low ({priorityCounts.low || 0})</option>
+          </select>
+        </label>
+
+        <label>
+          <span>System</span>
+          <select
+            value={filters.source}
+            onChange={(event) => updateFilter('source', event.target.value)}
+            aria-label="Filter by source"
+          >
+            <option value="all">All systems</option>
+            {sources.map((source) => (
+              <option value={source} key={source}>
+                {source}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span>Order</span>
+          <select
+            value={filters.sort}
+            onChange={(event) => updateFilter('sort', event.target.value)}
+            aria-label="Sort action queue"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="priority">Highest priority</option>
+          </select>
+        </label>
       </div>
     </section>
   );

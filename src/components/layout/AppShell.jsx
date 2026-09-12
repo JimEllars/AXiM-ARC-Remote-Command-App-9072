@@ -7,7 +7,9 @@ import { useOnyxStream } from '../../hooks/useOnyxStream';
 import { useTelemetry } from '../../hooks/useTelemetry';
 import { useCircuitBreakerState } from '../../hooks/useCircuitBreakerState';
 import { enablePushNotifications } from '../../services/pushNotificationService';
+import { resolveBulkActions } from '../../services/bulkResolutionService';
 import ActionConfirmModal from '../hitl/ActionConfirmModal';
+import BulkActionConfirmModal from '../hitl/BulkActionConfirmModal';
 import CircuitBreakerModal from '../emergency/CircuitBreakerModal';
 import CircuitBreakerRecoveryModal from '../emergency/CircuitBreakerRecoveryModal';
 import HitlDeck from '../hitl/HitlDeck';
@@ -25,7 +27,11 @@ function AppShell({ previewMode, onExitPreview }) {
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [confirmingAction, setConfirmingAction] = useState(null);
+  const [bulkConfirmation, setBulkConfirmation] = useState(null);
+  const [bulkProgress, setBulkProgress] = useState(null);
+  const [bulkResult, setBulkResult] = useState(null);
   const [submittingAction, setSubmittingAction] = useState(false);
+  const [bulkRetryAttempt, setBulkRetryAttempt] = useState(0);
   const [toast, setToast] = useState(null);
 
   const hitl = useHitlQueue(previewMode);
@@ -35,12 +41,14 @@ function AppShell({ previewMode, onExitPreview }) {
 
   useEffect(() => {
     if (!toast) return undefined;
+
     const timer = window.setTimeout(() => setToast(null), 4200);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
   useEffect(() => {
     const requestedView = window.location.hash.replace('#', '').split('?')[0];
+
     if (['telemetry', 'hitl', 'onyx'].includes(requestedView)) {
       setActiveView(requestedView);
     }
@@ -54,7 +62,20 @@ function AppShell({ previewMode, onExitPreview }) {
     setConfirmingAction({ item, decision });
   };
 
-  const resolveItem = async () => {
+  const requestBulkResolve = (items, decision) => {
+    setBulkResult(null);
+    setBulkProgress(null);
+    setBulkRetryAttempt(0);
+    setBulkConfirmation({ items, decision });
+  };
+
+  const updateQueueAfterResolution = (resolvedIds) => {
+    hitl.setQueue((current) =>
+      current.filter((entry) => !resolvedIds.includes(entry.id))
+    );
+  };
+
+  const resolveItem = async (comment = '') => {
     if (!confirmingAction) return;
 
     const { item, decision } = confirmingAction;
@@ -62,9 +83,7 @@ function AppShell({ previewMode, onExitPreview }) {
 
     try {
       if (previewMode) {
-        hitl.setQueue((current) =>
-          current.filter((entry) => entry.id !== item.id)
-        );
+        updateQueueAfterResolution([item.id]);
         setConfirmingAction(null);
         showToast(
           decision === 'APPROVED'
@@ -78,13 +97,15 @@ function AppShell({ previewMode, onExitPreview }) {
       const response = await fetch('/api/remote/hitl-resolve', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           task_id: item.id,
           decision,
           source_app: item.source_app,
           action_payload: item.action_payload,
-          comment: 'Resolved via AXiM Executive Remote'
+          comment: comment || 'Resolved via AXiM Executive Remote'
         })
       });
 
@@ -92,20 +113,120 @@ function AppShell({ previewMode, onExitPreview }) {
         throw new Error('The edge service rejected this action.');
       }
 
-      hitl.setQueue((current) =>
-        current.filter((entry) => entry.id !== item.id)
-      );
+      updateQueueAfterResolution([item.id]);
       setConfirmingAction(null);
       showToast(
         decision === 'APPROVED'
-          ? 'Action approved and dispatched securely.'
-          : 'Revision request sent to the originating system.',
+          ? comment
+            ? 'Action approved with an audit comment.'
+            : 'Action approved and dispatched securely.'
+          : comment
+            ? 'Revision request sent with an audit comment.'
+            : 'Revision request sent to the originating system.',
         'success'
       );
     } catch (error) {
       showToast(error.message, 'error');
     } finally {
       setSubmittingAction(false);
+    }
+  };
+
+  const dispatchBulkItems = async (
+    items,
+    decision,
+    comment = '',
+    retryAttempt = 0
+  ) => {
+    setSubmittingAction(true);
+    setBulkResult(null);
+    setBulkProgress({
+      completed: 0,
+      total: items.length
+    });
+
+    try {
+      const result = await resolveBulkActions({
+        items,
+        decision,
+        comment,
+        previewMode,
+        retryAttempt,
+        onProgress: setBulkProgress
+      });
+
+      updateQueueAfterResolution(result.resolvedIds);
+      setBulkResult(result);
+
+      if (result.failedItems.length) {
+        showToast(
+          `${result.resolvedIds.length} resolved. ${
+            result.failedItems.length
+          } action${
+            result.failedItems.length === 1 ? '' : 's'
+          } could not be dispatched.`,
+          'error'
+        );
+      } else {
+        showToast(
+          decision === 'APPROVED'
+            ? `${result.resolvedIds.length} actions approved securely.`
+            : `${result.resolvedIds.length} revision requests sent securely.`,
+          'success'
+        );
+      }
+
+      return result;
+    } catch (error) {
+      showToast(error.message, 'error');
+      throw error;
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  const resolveBulk = async (comment = '') => {
+    if (!bulkConfirmation?.items.length) return;
+
+    const { items, decision } = bulkConfirmation;
+
+    try {
+      await dispatchBulkItems(items, decision, comment);
+    } catch {
+      setBulkConfirmation(null);
+    }
+  };
+
+  const retryFailedBulk = async () => {
+    const failedItems = bulkResult?.failedItems || [];
+
+    if (!failedItems.length || !bulkConfirmation) return;
+
+    const previousResult = bulkResult;
+    const nextAttempt = bulkRetryAttempt + 1;
+    setBulkRetryAttempt(nextAttempt);
+
+    try {
+      const retryResult = await dispatchBulkItems(
+        failedItems,
+        bulkConfirmation.decision,
+        '',
+        nextAttempt
+      );
+
+      const resolvedIds = [
+        ...new Set([
+          ...previousResult.resolvedIds,
+          ...retryResult.resolvedIds
+        ])
+      ];
+
+      setBulkResult({
+        resolvedIds,
+        failedItems: retryResult.failedItems
+      });
+    } catch {
+      showToast('Retry dispatch could not be completed.', 'error');
     }
   };
 
@@ -117,7 +238,10 @@ function AppShell({ previewMode, onExitPreview }) {
 
     try {
       await enablePushNotifications();
-      showToast('This device is now registered for executive alerts.', 'success');
+      showToast(
+        'This device is now registered for executive alerts.',
+        'success'
+      );
     } catch (error) {
       showToast(error.message, 'error');
     }
@@ -134,17 +258,20 @@ function AppShell({ previewMode, onExitPreview }) {
           </button>
         </div>
       )}
+
       <Toast
         message={toast?.message}
         tone={toast?.tone}
         onDismiss={() => setToast(null)}
       />
+
       <ExecutiveHeader
         queueCount={hitl.queue.length}
         onEmergency={() => setEmergencyOpen(true)}
         onRecovery={() => setRecoveryOpen(true)}
         onNotifications={handleNotifications}
       />
+
       <main className="main-content">
         {activeView === 'telemetry' && (
           <>
@@ -207,6 +334,7 @@ function AppShell({ previewMode, onExitPreview }) {
               loading={hitl.loading}
               previewMode={previewMode}
               onResolve={requestResolve}
+              onResolveBulk={requestBulkResolve}
             />
           </>
         )}
@@ -226,6 +354,7 @@ function AppShell({ previewMode, onExitPreview }) {
           </>
         )}
       </main>
+
       <BottomNav
         activeView={activeView}
         onChange={(view) => {
@@ -234,6 +363,7 @@ function AppShell({ previewMode, onExitPreview }) {
         }}
         queueCount={hitl.queue.length}
       />
+
       <ActionConfirmModal
         item={confirmingAction?.item}
         decision={confirmingAction?.decision}
@@ -242,6 +372,26 @@ function AppShell({ previewMode, onExitPreview }) {
         onConfirm={resolveItem}
         onClose={() => !submittingAction && setConfirmingAction(null)}
       />
+
+      <BulkActionConfirmModal
+        items={bulkConfirmation?.items || []}
+        decision={bulkConfirmation?.decision}
+        open={Boolean(bulkConfirmation)}
+        submitting={submittingAction}
+        progress={bulkProgress}
+        result={bulkResult}
+        onConfirm={resolveBulk}
+        onRetry={retryFailedBulk}
+        onClose={() => {
+          if (!submittingAction) {
+            setBulkConfirmation(null);
+            setBulkProgress(null);
+            setBulkResult(null);
+            setBulkRetryAttempt(0);
+          }
+        }}
+      />
+
       <CircuitBreakerModal
         open={emergencyOpen}
         previewMode={previewMode}
@@ -250,6 +400,7 @@ function AppShell({ previewMode, onExitPreview }) {
         onLocalHalt={circuitBreaker.haltService}
         onNotify={showToast}
       />
+
       <CircuitBreakerRecoveryModal
         open={recoveryOpen}
         previewMode={previewMode}
