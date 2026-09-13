@@ -1,3 +1,5 @@
+import { supabaseClient } from './supabaseClient';
+
 function decodeVapidKey(value) {
   const padding = '='.repeat((4 - value.length % 4) % 4);
   const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -34,13 +36,32 @@ export async function enablePushNotifications() {
     applicationServerKey: decodeVapidKey(publicKey)
   });
 
+  const subData = serializeSubscription(subscription);
+
   const response = await fetch('/api/remote/push/subscribe', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(serializeSubscription(subscription))
+    body: JSON.stringify(subData)
   });
 
   if (!response.ok) throw new Error('Device registration failed.');
+
+  // Upsert to Supabase
+  const { error } = await supabaseClient
+    .from('executive_device_subscriptions')
+    .upsert({
+       user_email: 'james.ellars@axim.us.com',
+       endpoint: subData.endpoint,
+       p256dh: subData.p256dh,
+       auth_key: subData.auth_key,
+       user_agent: subData.user_agent,
+       updated_at: new Date().toISOString()
+    }, { onConflict: 'endpoint' });
+
+  if (error) {
+     console.error('Supabase push registration error', error);
+  }
+
   return subscription;
 }

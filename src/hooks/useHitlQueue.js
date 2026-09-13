@@ -13,6 +13,7 @@ export function useHitlQueue(previewMode = false) {
     !previewMode && hasSupabaseConfiguration
   );
   const [error, setError] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   const fetchQueue = useCallback(async () => {
     if (previewMode) {
@@ -77,11 +78,49 @@ export function useHitlQueue(previewMode = false) {
     };
   }, [fetchQueue, previewMode]);
 
+  useEffect(() => {
+    const handleOnline = async () => {
+      const cached = localStorage.getItem('arc_offline_actions');
+      if (cached) {
+        try {
+          const actions = JSON.parse(cached);
+          if (actions.length > 0) {
+            setSyncing(true);
+
+            for (const action of actions) {
+                await fetch('/api/remote/hitl-resolve', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(action)
+                }).catch(() => null); // suppress errors during background sync
+            }
+
+            localStorage.removeItem('arc_offline_actions');
+            setSyncing(false);
+
+            // Re-fetch queue to make sure it's accurate
+            fetchQueue();
+
+            // Dispatch a custom event so AppShell can show a toast
+            window.dispatchEvent(new CustomEvent('arc-offline-sync-complete', { detail: actions.length }));
+          }
+        } catch (e) {
+          console.error("Failed to sync offline actions", e);
+        }
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [fetchQueue]);
+
   return {
     queue,
     setQueue,
     loading,
     error,
+    syncing,
     isPreviewData: previewMode || !hasSupabaseConfiguration
   };
 }
