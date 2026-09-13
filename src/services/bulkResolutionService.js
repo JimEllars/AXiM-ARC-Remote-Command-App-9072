@@ -1,6 +1,10 @@
 const REQUEST_TIMEOUT_MS = 15000;
 
 function createDispatchError(response, body) {
+  if (response.status === 409) {
+    return new Error('409 Conflict: The action was already modified.');
+  }
+
   const message =
     body?.message ||
     body?.error ||
@@ -40,13 +44,11 @@ async function dispatchItem(item, decision, comment, retryAttempt = 0) {
 
     if (!response.ok) {
       let body = null;
-
       try {
         body = await response.json();
       } catch {
         body = null;
       }
-
       throw createDispatchError(response, body);
     }
 

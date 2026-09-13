@@ -25,20 +25,15 @@ self.addEventListener('fetch', (event) => {
 
   if (event.request.method !== 'GET') return;
 
-  // Bypass cache completely for API routes and websockets (supabase)
-  const isApiRequest = requestUrl.pathname.startsWith('/api/remote/')
+  // Bypass cache completely for API routes, websockets, Supabase, and SSE
+  const isApiRequest = requestUrl.pathname.startsWith('/api/')
     || requestUrl.pathname.includes('/rest/v1/')
-    || requestUrl.pathname.includes('/realtime/v1/');
+    || requestUrl.pathname.includes('/realtime/v1/')
+    || requestUrl.hostname.includes('supabase.co');
 
-  if (isApiRequest) {
-    // Force network fetch without caching for real-time and API to prevent stale data
-    if (requestUrl.pathname.includes('/realtime/v1/')) {
-       // Websocket upgrade requests shouldn't really reach here, but just in case
-       return;
-    }
+  if (isApiRequest || event.request.headers.get('accept')?.includes('text/event-stream')) {
     event.respondWith(
        fetch(event.request).catch(async () => {
-         // Fallback to cache only if strictly necessary
          const cache = await caches.open(API_CACHE);
          return cache.match(event.request);
        })

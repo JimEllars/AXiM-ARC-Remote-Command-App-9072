@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
+import { triggerHaptic } from '../../utils/haptics';
 import SafeIcon from '../../common/SafeIcon';
 
 const {
@@ -40,6 +41,7 @@ function BulkActionConfirmModal({
   }, [open, result]);
 
   const submit = () => {
+    if (!isApproval) triggerHaptic('warning');
     onConfirm(comment.trim());
   };
 
