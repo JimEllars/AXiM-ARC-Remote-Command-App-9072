@@ -1,5 +1,6 @@
 import React from 'react';
 import * as FiIcons from 'react-icons/fi';
+import { triggerHaptic } from '../../utils/haptics';
 import SafeIcon from '../../common/SafeIcon';
 
 const { FiActivity, FiCommand, FiLayers } = FiIcons;
@@ -18,7 +19,7 @@ function BottomNav({ activeView, onChange, queueCount }) {
           type="button"
           key={item.id}
           className={activeView === item.id ? 'active' : ''}
-          onClick={() => onChange(item.id)}
+          onClick={() => { triggerHaptic('light'); onChange(item.id); }}
         >
           <span>
             <SafeIcon icon={item.icon} />

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
+import { triggerHaptic } from '../../utils/haptics';
 import SafeIcon from '../../common/SafeIcon';
 import CompactDiffViewer from './CompactDiffViewer';
 import HitlBulkToolbar from './HitlBulkToolbar';

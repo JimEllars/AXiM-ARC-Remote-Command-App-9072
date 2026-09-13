@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
+import { triggerHaptic } from "../../utils/haptics";
 import SafeIcon from '../../common/SafeIcon';
 
 const {
@@ -62,6 +63,7 @@ function CircuitBreakerModal({
   const haltOperations = async () => {
     if (!canHalt) return;
 
+    triggerHaptic('danger');
     setSubmitting(true);
 
     try {

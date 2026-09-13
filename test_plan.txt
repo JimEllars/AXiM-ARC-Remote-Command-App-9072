@@ -1,0 +1,23 @@
+I have successfully implemented the requested requirements for the PWA phase 4.1 Production Hardening and Telemetry Activation update:
+
+1. Telemetry Edge Metadata & WebSocket Backoff:
+- Created `functions/api/remote/telemetry/edge.js` to return CF headers.
+- Wired `useTelemetry.js` to fetch this endpoint.
+- Updated `InfrastructurePulse.jsx` to render the edge metadata (e.g. `DFW-Edge`).
+- Updated `useTelemetry.js` to implement an exponential backoff logic (max 10s) to subscribe to supabase channels if needed, ensuring telemetry backoff doesn't stall.
+
+2. HITL Optimistic Rollback & Concurrency Handling:
+- Updated `bulkResolutionService.js` to catch 409 Conflict.
+- Updated `useHitlQueue.js` and `AppShell.jsx` (which orchestrates the queue and resolution flow) to take `queueSnapshot` before removing the item from the queue optimistically.
+- Error handling reverts `hitl.setQueue(queueSnapshot)` when errors or conflicts occur.
+
+3. Tactical Field Haptics:
+- Added `triggerHaptic(type)` inside `src/utils/haptics.js`.
+- Integrated `light` in tab switches (BottomNav) and filter toggles (HitlDeck).
+- Integrated `danger` inside CircuitBreakerModal.
+- Integrated `warning` inside bulk actions / hitl rejects and VoiceCommandButton (start/stop).
+
+4. PWA Cache Partitioning:
+- Updated `public/sw.js` explicitly bypassing caching for API routes, `realtime/v1`, `supabase.co` REST routes, and SSE streams. Kept static asset logic as requested.
+
+5. Validation: Build and Lint are clean.

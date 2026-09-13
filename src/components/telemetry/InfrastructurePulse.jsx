@@ -3,7 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import SystemHealthDrilldown from './SystemHealthDrilldown';
 
-const { FiCloud, FiCpu, FiDatabase } = FiIcons;
+const { FiCloud, FiCpu, FiDatabase, FiMapPin } = FiIcons;
 
 const services = [
   { key: 'edge', label: 'Cloudflare Edge', icon: FiCloud },
@@ -11,8 +11,10 @@ const services = [
   { key: 'onyx', label: 'Onyx Bridge', icon: FiCpu }
 ];
 
-function InfrastructurePulse({ pulses, previewMode }) {
+function InfrastructurePulse({ pulses, previewMode, edgeFingerprint }) {
   const [selectedService, setSelectedService] = useState(null);
+
+  const popLabel = edgeFingerprint ? `${edgeFingerprint.colo}-Edge` : (previewMode ? 'Local-Edge' : 'Connecting...');
 
   return (
     <>
@@ -21,6 +23,9 @@ function InfrastructurePulse({ pulses, previewMode }) {
           <div>
             <p className="eyebrow">Infrastructure</p>
             <h2>Live pulse</h2>
+            <p style={{ fontSize: '0.8rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+              <SafeIcon icon={FiMapPin} /> {popLabel}
+            </p>
           </div>
           <span className="status-pill"><i /> Operational</span>
         </div>

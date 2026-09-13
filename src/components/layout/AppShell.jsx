@@ -99,10 +99,11 @@ function AppShell({ previewMode, onExitPreview }) {
 
     const { item, decision } = confirmingAction;
     setSubmittingAction(true);
+    const queueSnapshot = [...hitl.queue];
 
     try {
       if (previewMode) {
-        updateQueueAfterResolution([item.id]);
+        hitl.setQueue((current) => current.filter((q) => q.id !== item.id));
         setConfirmingAction(null);
         showToast(
           decision === 'APPROVED'
@@ -125,7 +126,7 @@ function AppShell({ previewMode, onExitPreview }) {
           const cached = JSON.parse(localStorage.getItem('arc_offline_actions') || '[]');
           cached.push(payload);
           localStorage.setItem('arc_offline_actions', JSON.stringify(cached));
-          updateQueueAfterResolution([item.id]);
+          // Queue already updated optimistically
           setConfirmingAction(null);
           showToast('Offline: Action queued for automatic delivery.', 'info');
           return;
@@ -141,10 +142,12 @@ function AppShell({ previewMode, onExitPreview }) {
       });
 
       if (!response.ok) {
+        if (response.status === 409) {
+           throw new Error('409 Conflict: The action was already modified.');
+        }
         throw new Error('The edge service rejected this action.');
       }
 
-      updateQueueAfterResolution([item.id]);
       setConfirmingAction(null);
       showToast(
         decision === 'APPROVED'
@@ -168,11 +171,17 @@ function AppShell({ previewMode, onExitPreview }) {
           const cached = JSON.parse(localStorage.getItem('arc_offline_actions') || '[]');
           cached.push(payload);
           localStorage.setItem('arc_offline_actions', JSON.stringify(cached));
-          updateQueueAfterResolution([item.id]);
+          // Queue already updated optimistically
           setConfirmingAction(null);
           showToast('Offline: Action queued for automatic delivery.', 'info');
       } else {
-          showToast(error.message, 'error');
+          hitl.setQueue(queueSnapshot); // Revert on failure
+          if (error.message.includes('409 Conflict')) {
+            showToast('Sync collision: This action was already resolved.', 'error');
+            hitl.fetchQueue();
+          } else {
+            showToast(error.message, 'error');
+          }
       }
     } finally {
       setSubmittingAction(false);
@@ -202,7 +211,10 @@ function AppShell({ previewMode, onExitPreview }) {
         onProgress: setBulkProgress
       });
 
-      updateQueueAfterResolution(result.resolvedIds);
+      // Already optimistically removed, but we need to re-add failed ones
+      if (result.failedItems.length > 0) {
+        hitl.setQueue((current) => [...current, ...result.failedItems]);
+      }
       setBulkResult(result);
 
       if (result.failedItems.length) {
@@ -236,10 +248,19 @@ function AppShell({ previewMode, onExitPreview }) {
     if (!bulkConfirmation?.items.length) return;
 
     const { items, decision } = bulkConfirmation;
+    const queueSnapshot = [...hitl.queue];
+
+    // Optimistic remove
+    hitl.setQueue((current) => current.filter((q) => !items.find(i => i.id === q.id)));
 
     try {
       await dispatchBulkItems(items, decision, comment);
-    } catch {
+    } catch (error) {
+      hitl.setQueue(queueSnapshot); // Rollback
+      if (error.message?.includes('409 Conflict')) {
+        showToast('Sync collision: Some actions were already resolved.', 'error');
+        hitl.fetchQueue();
+      }
       setBulkConfirmation(null);
     }
   };
@@ -343,6 +364,7 @@ function AppShell({ previewMode, onExitPreview }) {
               loading={telemetry.loading}
             />
             <InfrastructurePulse
+              edgeFingerprint={telemetry.edgeFingerprint}
               pulses={telemetry.pulses}
               previewMode={previewMode}
             />

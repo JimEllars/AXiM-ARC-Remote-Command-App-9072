@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import * as FiIcons from 'react-icons/fi';
+import { triggerHaptic } from '../../utils/haptics';
 import SafeIcon from '../../common/SafeIcon';
 
 const { FiMic, FiSquare, FiLoader, FiAlertCircle } = FiIcons;
@@ -42,6 +43,7 @@ function VoiceCommandButton({ disabled, onRecording, onError }) {
   }, [onRecording, onError]);
 
   const toggleRecording = async () => {
+    triggerHaptic('warning');
     if (recording) {
       setMicState('processing');
       if (recorderRef.current && recorderRef.current.state !== 'inactive') {
