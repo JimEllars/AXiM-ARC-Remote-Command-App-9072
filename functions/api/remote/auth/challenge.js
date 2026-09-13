@@ -1,9 +1,26 @@
+const defaultHeaders = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+};
+
+export async function onRequestOptions() {
+  return new Response(null, { status: 204, headers: defaultHeaders });
+}
+
 export async function onRequestPost(context) {
   const { request } = context;
   try {
-    const data = await request.json();
+    let data;
+    try {
+      data = await request.json();
+    } catch (e) {
+      return new Response(JSON.stringify({ error: 'Malformed JSON payload.' }), { status: 400, headers: defaultHeaders });
+    }
+
     if (data.email !== 'james.ellars@axim.us.com' && data.email !== 'jrellars@gmail.com') {
-      return new Response(JSON.stringify({ error: 'Unauthorized user.' }), { status: 403 });
+      return new Response(JSON.stringify({ error: 'Unauthorized user.' }), { status: 403, headers: defaultHeaders });
     }
 
     // Simulate FIDO2 challenge generation for AXiM Passport
@@ -23,9 +40,9 @@ export async function onRequestPost(context) {
     }
 
     return new Response(JSON.stringify({ challenge }), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: defaultHeaders
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: defaultHeaders });
   }
 }

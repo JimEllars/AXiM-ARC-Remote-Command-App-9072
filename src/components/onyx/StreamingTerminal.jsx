@@ -1,26 +1,48 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import CommandHistory from './CommandHistory';
 import CommandTemplates from './CommandTemplates';
 import VoiceCommandButton from './VoiceCommandButton';
 
-const { FiChevronRight, FiLoader, FiTerminal } = FiIcons;
+const { FiChevronRight, FiLoader, FiTerminal, FiArrowDown } = FiIcons;
 
 function StreamingTerminal({ onyx, previewMode }) {
   const [prompt, setPrompt] = useState('');
   const terminalRef = useRef(null);
+  const [autoScroll, setAutoScroll] = useState(true);
 
-  useEffect(() => {
+  const scrollToBottom = useCallback(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
-  }, [onyx.tokens]);
+  }, []);
+
+  useEffect(() => {
+    if (autoScroll) {
+      scrollToBottom();
+    }
+  }, [onyx.tokens, autoScroll, scrollToBottom]);
+
+  const handleScroll = () => {
+    if (!terminalRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = terminalRef.current;
+
+    // If the user scrolls up, disable autoScroll.
+    // If they scroll to the very bottom, enable it.
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 10;
+    if (isAtBottom && !autoScroll) {
+      setAutoScroll(true);
+    } else if (!isAtBottom && autoScroll) {
+      setAutoScroll(false);
+    }
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
     onyx.dispatchPrompt(prompt);
     setPrompt('');
+    setAutoScroll(true);
   };
 
   const handleTemplate = (template) => {
@@ -29,11 +51,17 @@ function StreamingTerminal({ onyx, previewMode }) {
 
   const handleVoice = (audioOrText) => {
     onyx.dispatchVoice(audioOrText);
+    setAutoScroll(true);
   };
 
   return (
     <section className="onyx-terminal">
-      <div className="terminal-display" ref={terminalRef}>
+      <div
+        className="terminal-display"
+        ref={terminalRef}
+        onScroll={handleScroll}
+        style={{ position: 'relative' }}
+      >
         {!onyx.tokens && !onyx.isStreaming && !onyx.isTranscribing ? (
           <div className="terminal-empty">
             <SafeIcon icon={FiTerminal} />
@@ -50,9 +78,37 @@ function StreamingTerminal({ onyx, previewMode }) {
             {onyx.isStreaming && <i className="cursor" />}
           </div>
         )}
-      </div>
 
-      {onyx.error && <div className="inline-error">{onyx.error}</div>}
+        {!autoScroll && (onyx.isStreaming || onyx.tokens) && (
+          <button
+             type="button"
+             className="auto-scroll-btn"
+             onClick={() => {
+                setAutoScroll(true);
+                scrollToBottom();
+             }}
+             aria-label="Scroll to bottom"
+             style={{
+                position: 'absolute',
+                bottom: '10px',
+                right: '10px',
+                background: 'rgba(20, 25, 35, 0.8)',
+                border: '1px solid #334155',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                cursor: 'pointer',
+                zIndex: 10
+             }}
+          >
+            <SafeIcon icon={FiArrowDown} />
+          </button>
+        )}
+      </div>
 
       <div className="terminal-controls">
         <form onSubmit={handleSubmit}>
