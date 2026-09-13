@@ -10,26 +10,45 @@ async function verifyHmac(payload, signature, secret) {
     return await crypto.subtle.verify('HMAC', key, sigBuf, enc.encode(payload));
 }
 
+const defaultHeaders = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Axim-Signature'
+};
+
+export async function onRequestOptions() {
+  return new Response(null, { status: 204, headers: defaultHeaders });
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {
-    // Validate session or JWT in real app, here we check HMAC
     const signature = request.headers.get('X-Axim-Signature');
-    const rawBody = await request.clone().text();
 
-    // In production we would verify HMAC here
-    // if (!await verifyHmac(rawBody, signature, env.AXIM_HMAC_SECRET)) {
-    //    return new Response('Invalid signature', { status: 401 });
-    // }
+    let data;
+    try {
+      data = await request.json();
+    } catch (e) {
+      return new Response(JSON.stringify({ error: 'Malformed JSON payload.' }), { status: 400, headers: defaultHeaders });
+    }
 
-    const data = await request.json();
+    if (!data || typeof data !== 'object') {
+      return new Response(JSON.stringify({ error: 'Invalid payload.' }), { status: 400, headers: defaultHeaders });
+    }
+
     const { task_id, decision, source_app, action_payload, comment } = data;
 
-    // Check emergency switches
-    // const kvState = await env.ARC_STATE.get('emergency_halt');
-    // if (kvState === 'true') {
-    //    return new Response(JSON.stringify({ error: 'System is halted.' }), { status: 503 });
-    // }
+    if (!task_id || !decision) {
+      return new Response(JSON.stringify({ error: 'Missing required fields: task_id, decision' }), { status: 400, headers: defaultHeaders });
+    }
+
+    if (env && env.ARC_STATE) {
+      const kvState = await env.ARC_STATE.get('emergency_halt');
+      if (kvState === 'true') {
+         return new Response(JSON.stringify({ error: 'System is halted.' }), { status: 503, headers: defaultHeaders });
+      }
+    }
 
     let targetUrl = '';
     if (source_app === 'Coding Lab') {
@@ -38,16 +57,22 @@ export async function onRequestPost(context) {
         targetUrl = 'https://support.axim.us.com/api/v1/tasks/resolve';
     }
 
-    const downstreamResponse = await fetch(targetUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Axim-Signature': signature || 'dev-sig' },
-      body: JSON.stringify({ task_id, decision, action_payload, comment })
-    }).catch(() => null);
+    // Defensive check if fetch succeeds
+    try {
+      await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Axim-Signature': signature || 'dev-sig' },
+        body: JSON.stringify({ task_id, decision, action_payload, comment })
+      });
+    } catch (fetchErr) {
+       // Ignore fetch errors to remote target if unreachable in fallback
+       console.error("Downstream fetch failed:", fetchErr);
+    }
 
     return new Response(JSON.stringify({ success: true, task_id }), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: defaultHeaders
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: defaultHeaders });
   }
 }

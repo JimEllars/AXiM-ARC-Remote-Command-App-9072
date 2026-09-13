@@ -2,10 +2,11 @@ import React, { useRef, useState, useEffect } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 
-const { FiMic, FiSquare } = FiIcons;
+const { FiMic, FiSquare, FiLoader, FiAlertCircle } = FiIcons;
 
 function VoiceCommandButton({ disabled, onRecording, onError }) {
   const [recording, setRecording] = useState(false);
+  const [micState, setMicState] = useState('idle'); // idle, listening, processing, error
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
   const recognitionRef = useRef(null);
@@ -18,22 +19,31 @@ function VoiceCommandButton({ disabled, onRecording, onError }) {
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
       recognitionRef.current.onresult = (event) => {
+        setMicState('processing');
         const text = event.results[0][0].transcript;
         if (text && onRecording) {
-            onRecording(text); // Can pass text or audio. We can let the parent handle both.
+            onRecording(text);
         }
+        setRecording(false);
+        setMicState('idle');
       };
       recognitionRef.current.onerror = (event) => {
           console.error("Speech recognition error", event.error);
+          setRecording(false);
+          setMicState('error');
           if(event.error === 'not-allowed') {
               onError?.('Microphone permission is required for voice commands.');
+          } else {
+              onError?.('Speech recognition failed.');
           }
+          setTimeout(() => setMicState('idle'), 2000);
       }
     }
   }, [onRecording, onError]);
 
   const toggleRecording = async () => {
     if (recording) {
+      setMicState('processing');
       if (recorderRef.current && recorderRef.current.state !== 'inactive') {
           recorderRef.current.stop();
       }
@@ -44,6 +54,7 @@ function VoiceCommandButton({ disabled, onRecording, onError }) {
     }
 
     try {
+      setMicState('listening');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       try {
@@ -62,6 +73,7 @@ function VoiceCommandButton({ disabled, onRecording, onError }) {
 
             stream.getTracks().forEach((track) => track.stop());
             setRecording(false);
+            setMicState('idle');
             onRecording(audio);
           });
 
@@ -78,27 +90,44 @@ function VoiceCommandButton({ disabled, onRecording, onError }) {
       }
 
     } catch (err) {
+      setRecording(false);
+      setMicState('error');
+
+      let msg = 'Could not start audio capture.';
       if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
-          onError?.('Microphone permission is required for voice commands.');
+          msg = 'Microphone permission is required for voice commands.';
       } else if (err.name === 'NotFoundError') {
-          onError?.('No microphone found on this device.');
-      } else {
-          onError?.('Could not start audio capture.');
+          msg = 'No microphone found on this device.';
       }
+
+      onError?.(msg);
+
+      // Dispatch a toast event instead of just throwing error to onyx context
+      window.dispatchEvent(new CustomEvent('arc-toast', {
+         detail: { message: msg, tone: 'error' }
+      }));
+
+      setTimeout(() => setMicState('idle'), 2000);
     }
+  };
+
+  const getIcon = () => {
+      if (micState === 'error') return FiAlertCircle;
+      if (micState === 'processing') return FiLoader;
+      return recording ? FiSquare : FiMic;
   };
 
   return (
     <button
       type="button"
-      className={`voice-button ${recording ? 'recording' : ''}`}
+      className={`voice-button ${recording ? 'recording' : ''} ${micState}`}
       onClick={toggleRecording}
-      disabled={disabled || !navigator.mediaDevices}
+      disabled={disabled || !navigator.mediaDevices || micState === 'processing'}
     >
       <span>
-        <SafeIcon icon={recording ? FiSquare : FiMic} />
+        <SafeIcon icon={getIcon()} className={micState === 'processing' ? 'spin' : ''} />
       </span>
-      {recording ? 'Tap to send' : 'Hold the command line'}
+      {micState === 'processing' ? 'Processing...' : recording ? 'Tap to send' : 'Hold the command line'}
     </button>
   );
 }

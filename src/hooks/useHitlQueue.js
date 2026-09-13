@@ -29,17 +29,23 @@ export function useHitlQueue(previewMode = false) {
     }
 
     setLoading(true);
-    const { data, error: queryError } = await supabaseClient
-      .from('hitl_audit_logs')
-      .select('*')
-      .eq('status', 'Pending')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error: queryError } = await supabaseClient
+        .from('hitl_audit_logs')
+        .select('*')
+        .eq('status', 'Pending')
+        .order('created_at', { ascending: false });
 
-    if (queryError) {
-      setError(queryError.message);
+      if (queryError) {
+        setError(queryError.message);
+        setQueue(localHitlQueue);
+      } else {
+        setQueue(data || []);
+        setError('');
+      }
+    } catch (err) {
+      setError('Connection error falling back to local data.');
       setQueue(localHitlQueue);
-    } else {
-      setQueue(data || []);
     }
 
     setLoading(false);
@@ -71,10 +77,15 @@ export function useHitlQueue(previewMode = false) {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+           // Graceful fallback during drop
+           setQueue(localHitlQueue);
+        }
+      });
 
     return () => {
-      supabaseClient.removeChannel(channel);
+      supabaseClient.removeChannel(channel).catch(() => null);
     };
   }, [fetchQueue, previewMode]);
 
@@ -121,6 +132,6 @@ export function useHitlQueue(previewMode = false) {
     loading,
     error,
     syncing,
-    isPreviewData: previewMode || !hasSupabaseConfiguration
+    isPreviewData: previewMode || !hasSupabaseConfiguration || error !== ''
   };
 }

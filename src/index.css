@@ -214,3 +214,17 @@
     transform: rotate(360deg);
   }
 }
+/* PWA Safe Area Insets for Mobile Touchpoints */
+.executive-header {
+  padding-top: max(16px, env(safe-area-inset-top));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.8);
+}
+
+.bottom-nav {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(30, 41, 59, 0.8);
+}

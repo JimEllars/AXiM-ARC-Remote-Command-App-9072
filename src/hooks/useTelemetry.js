@@ -19,6 +19,7 @@ export function useTelemetry(previewMode = false) {
     }
 
     let active = true;
+    let pollInterval = null;
 
     const loadTelemetry = async () => {
       try {
@@ -35,6 +36,7 @@ export function useTelemetry(previewMode = false) {
           setPulses(summary.pulses || localPulseData);
         }
       } catch {
+        // Fallback for offline or local demo mode
         if (active) {
           setMetrics(localPreviewMetrics);
           setPulses(localPulseData);
@@ -45,8 +47,13 @@ export function useTelemetry(previewMode = false) {
     };
 
     loadTelemetry();
+
+    // Simulate real-time fallback updates when API isn't a websocket
+    pollInterval = setInterval(loadTelemetry, 15000);
+
     return () => {
       active = false;
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [previewMode]);
 

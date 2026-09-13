@@ -83,6 +83,17 @@ function AppShell({ previewMode, onExitPreview }) {
     );
   };
 
+
+  useEffect(() => {
+    const handleToast = (e) => {
+      if (e.detail) {
+        showToast(e.detail.message, e.detail.tone || 'info');
+      }
+    };
+    window.addEventListener('arc-toast', handleToast);
+    return () => window.removeEventListener('arc-toast', handleToast);
+  }, []);
+
   const resolveItem = async (comment = '') => {
     if (!confirmingAction) return;
 

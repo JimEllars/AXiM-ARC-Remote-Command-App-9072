@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { supabaseClient, hasSupabaseConfiguration } from '../services/supabaseClient';
 
 const STORAGE_KEY = 'axim-circuit-breaker-state';
 
@@ -38,10 +39,60 @@ export function useCircuitBreakerState(previewMode = false) {
   const [services, setServices] = useState(readServices);
 
   useEffect(() => {
-    if (!previewMode) return;
-
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(services));
-  }, [previewMode, services]);
+  }, [services]);
+
+  useEffect(() => {
+    if (previewMode || !hasSupabaseConfiguration) return undefined;
+
+    let active = true;
+    let channel;
+
+    const fetchState = async () => {
+        try {
+            const { data, error } = await supabaseClient
+                .from('emergency_switches')
+                .select('*');
+            if (active && !error && data) {
+                // If real data exists, update our services. Otherwise we rely on local fallback.
+                setServices(current => current.map(service => {
+                    const remote = data.find(s => s.service_key === service.service_key);
+                    return remote ? { ...service, is_halted: remote.is_halted } : service;
+                }));
+            }
+        } catch(e) {
+            // Fallback to local storage
+        }
+    };
+
+    fetchState();
+
+    channel = supabaseClient
+      .channel('arc-circuit-breaker')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'emergency_switches' },
+        ({ new: nextItem }) => {
+           if (nextItem && nextItem.service_key) {
+               setServices(current => current.map(service =>
+                   service.service_key === nextItem.service_key ? { ...service, is_halted: nextItem.is_halted } : service
+               ));
+           }
+        }
+      )
+      .subscribe((status) => {
+          if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+             // Let local storage maintain last known state
+          }
+      });
+
+    return () => {
+      active = false;
+      if (channel) {
+          supabaseClient.removeChannel(channel).catch(() => null);
+      }
+    };
+  }, [previewMode]);
 
   const haltService = useCallback((serviceKey = 'global') => {
     setServices((current) => current.map((service) => (
