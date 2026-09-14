@@ -203,6 +203,7 @@ function AppShell({ previewMode, onExitPreview }) {
 
     try {
       const result = await resolveBulkActions({
+        currentQueue: hitl.queue,
         items,
         decision,
         comment,
@@ -213,7 +214,8 @@ function AppShell({ previewMode, onExitPreview }) {
 
       // Already optimistically removed, but we need to re-add failed ones
       if (result.failedItems.length > 0) {
-        hitl.setQueue((current) => [...current, ...result.failedItems]);
+        hitl.setQueue(result.rollbackQueue); // Re-add failed items correctly from rollback queue
+        hitl.setQueue((current) => current.filter((q) => !result.resolvedIds.includes(q.id)));
       }
       setBulkResult(result);
 
@@ -316,7 +318,7 @@ function AppShell({ previewMode, onExitPreview }) {
   };
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))", paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
       {previewMode && (
         <div className="preview-banner">
           <SafeIcon icon={FiEye} />
@@ -334,6 +336,8 @@ function AppShell({ previewMode, onExitPreview }) {
       />
 
       <ExecutiveHeader
+        connectionStatus={telemetry.connectionStatus}
+
         queueCount={hitl.queue.length}
         onEmergency={() => setEmergencyOpen(true)}
         onRecovery={() => setRecoveryOpen(true)}

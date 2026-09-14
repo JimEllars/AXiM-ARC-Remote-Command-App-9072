@@ -2,8 +2,26 @@ const defaultHeaders = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Axim-Signature',
+  'X-Content-Type-Options': 'nosniff'
 };
+
+
+function createResponse(success, data, error, context, status = 200, headers = defaultHeaders) {
+  const payload = {
+    success,
+    data: data || null,
+    error: error ? { code: error.code || 'UNKNOWN_ERROR', message: error.message || error } : null,
+    meta: {
+      timestamp: new Date().toISOString(),
+      edgeRegion: context?.request?.cf?.colo || 'Local'
+    }
+  };
+  if (error && error.fallback) {
+      payload.fallbackMode = true;
+  }
+  return new Response(JSON.stringify(payload), { status, headers });
+}
 
 export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: defaultHeaders });
@@ -16,11 +34,11 @@ export async function onRequestPost(context) {
     try {
       data = await request.json();
     } catch (e) {
-      return new Response(JSON.stringify({ error: 'Malformed JSON payload.' }), { status: 400, headers: defaultHeaders });
+      return createResponse(false, null, { code: 'BAD_REQUEST', message: 'Malformed JSON payload.' }, context, 400);
     }
 
     if (data.email !== 'james.ellars@axim.us.com' && data.email !== 'jrellars@gmail.com') {
-      return new Response(JSON.stringify({ error: 'Unauthorized user.' }), { status: 403, headers: defaultHeaders });
+      return createResponse(false, null, { code: 'UNAUTHORIZED', message: 'Unauthorized user.' }, context, 403);
     }
 
     // Verify signature with Passport
@@ -39,7 +57,7 @@ export async function onRequestPost(context) {
     }
 
     if (!isValid) {
-      return new Response(JSON.stringify({ error: 'Invalid verification.' }), { status: 401, headers: defaultHeaders });
+      return createResponse(false, null, { code: 'UNAUTHORIZED', message: 'Invalid verification.' }, context, 401);
     }
 
     const token = btoa(JSON.stringify({ user: data.email, timestamp: Date.now() }));
@@ -47,10 +65,8 @@ export async function onRequestPost(context) {
     const headers = new Headers(defaultHeaders);
     headers.set('Set-Cookie', `axim_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Domain=.axim.us.com`);
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers
-    });
+    return createResponse(true, null, null, context, 200, headers);
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: defaultHeaders });
+    return createResponse(false, null, { code: 'INTERNAL_ERROR', message: err.message }, context, 500);
   }
 }

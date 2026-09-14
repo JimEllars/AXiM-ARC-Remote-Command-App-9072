@@ -13,7 +13,7 @@ const items = [
 
 function BottomNav({ activeView, onChange, queueCount }) {
   return (
-    <nav className="bottom-nav" aria-label="Primary navigation">
+    <nav className="bottom-nav" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }} aria-label="Primary navigation">
       {items.map((item) => (
         <button
           type="button"

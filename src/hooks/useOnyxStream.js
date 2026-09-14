@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCommandHistory } from './useCommandHistory';
 import { getLocalOnyxResponse } from '../services/localDemoData';
 
@@ -22,34 +22,6 @@ async function streamLocalResponse(prompt, onToken) {
   return output;
 }
 
-async function streamRemoteResponse(prompt, onToken) {
-  const response = await fetch(`${ONYX_URL}/api/v1/stream`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt,
-      source: 'remote_companion'
-    })
-  });
-
-  if (!response.ok || !response.body) {
-    throw new Error('Onyx command dispatch failed.');
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let output = '';
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    output += decoder.decode(value, { stream: true });
-    onToken(output);
-  }
-
-  return output;
-}
 
 export function useOnyxStream(previewMode = false) {
   const [tokens, setTokens] = useState('');
@@ -57,27 +29,64 @@ export function useOnyxStream(previewMode = false) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState('');
   const commandHistory = useCommandHistory();
+  const [abortController, setAbortController] = useState(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortController) {
+        abortController.abort();
+      }
+    };
+  }, [abortController]);
 
   const dispatchPrompt = async (prompt) => {
     const cleanPrompt = prompt.trim();
 
     if (!cleanPrompt || isStreaming || isTranscribing) return;
 
+    if (abortController) abortController.abort();
+    const controller = new AbortController();
+    setAbortController(controller);
+
     setTokens('');
     setError('');
     setIsStreaming(true);
 
     try {
-      const output = previewMode
-        ? await streamLocalResponse(cleanPrompt, setTokens)
-        : await streamRemoteResponse(cleanPrompt, setTokens);
+      if (previewMode) {
+          const output = await streamLocalResponse(cleanPrompt, setTokens);
+          commandHistory.addEntry({ command: cleanPrompt, result: output, status: 'preview' });
+      } else {
+          const response = await fetch(`${ONYX_URL}/api/v1/stream`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, source: 'remote_companion' }),
+            signal: controller.signal
+          });
 
-      commandHistory.addEntry({
-        command: cleanPrompt,
-        result: output,
-        status: previewMode ? 'preview' : 'success'
-      });
+          if (!response.ok || !response.body) {
+            throw new Error('Onyx command dispatch failed.');
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let output = '';
+
+          try {
+              while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                output += decoder.decode(value, { stream: true });
+                setTokens(output);
+              }
+              commandHistory.addEntry({ command: cleanPrompt, result: output, status: 'success' });
+          } finally {
+              reader.releaseLock();
+          }
+      }
     } catch (streamError) {
+      if (streamError.name === 'AbortError') return;
       setError(streamError.message);
       commandHistory.addEntry({
         command: cleanPrompt,
@@ -86,6 +95,7 @@ export function useOnyxStream(previewMode = false) {
       });
     } finally {
       setIsStreaming(false);
+      setAbortController(null);
     }
   };
 
