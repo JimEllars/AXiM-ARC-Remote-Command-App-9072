@@ -114,7 +114,7 @@ function CircuitBreakerModal({
           onClick={onClose}
         >
           <motion.section
-            className="emergency-modal"
+            className="emergency-modal" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))", paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
             initial={{ scale: 0.94, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.94, opacity: 0 }}

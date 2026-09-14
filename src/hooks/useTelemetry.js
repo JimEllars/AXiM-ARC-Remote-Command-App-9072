@@ -10,7 +10,37 @@ export function useTelemetry(previewMode = false) {
     onyx: null
   });
   const [edgeFingerprint, setEdgeFingerprint] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState(previewMode ? 'Local Cache' : 'Connecting');
   const [loading, setLoading] = useState(!previewMode);
+
+  const smoothMetrics = (prev, next) => {
+    if (!prev || prev.length === 0) return next;
+
+    return next.map(newItem => {
+        const prevItem = prev.find(p => p.label === newItem.label);
+        if (!prevItem) return newItem;
+
+        const prevVal = parseFloat(prevItem.value.toString().replace(/[^0-9.]/g, ''));
+        const nextVal = parseFloat(newItem.value.toString().replace(/[^0-9.]/g, ''));
+
+        if (!isNaN(prevVal) && !isNaN(nextVal)) {
+            const alpha = 0.3;
+            const smoothed = (prevVal * (1 - alpha)) + (nextVal * alpha);
+
+            const suffixMatch = newItem.value.toString().match(/[^0-9.]+$/);
+            const suffix = suffixMatch ? suffixMatch[0] : '';
+
+            const decimalsMatch = newItem.value.toString().match(/\.([0-9]+)/);
+            const decimals = decimalsMatch ? decimalsMatch[1].length : 0;
+
+            return {
+                ...newItem,
+                value: smoothed.toFixed(decimals) + suffix
+            };
+        }
+        return newItem;
+    });
+  };
 
   useEffect(() => {
     let active = true;
@@ -60,7 +90,7 @@ export function useTelemetry(previewMode = false) {
         const summary = await response.json();
 
         if (active) {
-          setMetrics(summary.metrics || []);
+          setMetrics(prev => smoothMetrics(prev, summary.metrics || []));
           setPulses(summary.pulses || localPulseData);
         }
       } catch {
@@ -76,6 +106,7 @@ export function useTelemetry(previewMode = false) {
     const subscribeToRealtime = (attempt = 0) => {
       if (!hasSupabaseConfiguration) {
         pollInterval = setInterval(loadTelemetrySummary, 15000);
+        if (active) setConnectionStatus('Degraded: Local Cache');
         return;
       }
 
@@ -84,7 +115,7 @@ export function useTelemetry(previewMode = false) {
       channel
         .on('broadcast', { event: 'telemetry_update' }, (payload) => {
            if (active && payload.metrics) {
-             setMetrics(payload.metrics);
+             setMetrics(prev => smoothMetrics(prev, payload.metrics));
            }
            if (active && payload.pulses) {
              setPulses(payload.pulses);
@@ -92,14 +123,16 @@ export function useTelemetry(previewMode = false) {
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            attempt = 0; // reset attempts
+            attempt = 0;
+            if (active) setConnectionStatus('Cloudflare Global');
           }
           if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+             if (active) setConnectionStatus('Degraded: Polling / Cache');
              if (channel) {
                 supabaseClient.removeChannel(channel).catch(() => null);
              }
              if (active) {
-                const backoff = Math.min(1000 * Math.pow(2, attempt), 10000); // 1s, 2s, 4s, 8s, 10s
+                const backoff = Math.min(1000 * Math.pow(2, attempt), 10000);
                 reconnectTimeout = setTimeout(() => {
                   subscribeToRealtime(attempt + 1);
                 }, backoff);
@@ -124,6 +157,7 @@ export function useTelemetry(previewMode = false) {
     pulses,
     edgeFingerprint,
     loading,
+    connectionStatus,
     isPreviewData: previewMode
   };
 }

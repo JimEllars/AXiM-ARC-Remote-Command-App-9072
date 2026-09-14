@@ -8,7 +8,8 @@ function ExecutiveHeader({
   queueCount,
   onEmergency,
   onRecovery,
-  onNotifications
+  onNotifications,
+  connectionStatus
 }) {
   const [pushEnabled, setPushEnabled] = useState(false);
 
@@ -31,7 +32,7 @@ function ExecutiveHeader({
         <div className="mini-mark">AX</div>
         <div>
           <p>Executive Remote</p>
-          <span><i /> Core connected</span>
+          <span><i className={connectionStatus && connectionStatus.includes('Degraded') ? 'degraded' : ''} /> Edge: {connectionStatus || 'Connecting'}</span>
         </div>
       </div>
 

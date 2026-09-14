@@ -14,8 +14,26 @@ const defaultHeaders = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Axim-Signature'
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Axim-Signature',
+  'X-Content-Type-Options': 'nosniff'
 };
+
+
+function createResponse(success, data, error, context, status = 200, headers = defaultHeaders) {
+  const payload = {
+    success,
+    data: data || null,
+    error: error ? { code: error.code || 'UNKNOWN_ERROR', message: error.message || error } : null,
+    meta: {
+      timestamp: new Date().toISOString(),
+      edgeRegion: context?.request?.cf?.colo || 'Local'
+    }
+  };
+  if (error && error.fallback) {
+      payload.fallbackMode = true;
+  }
+  return new Response(JSON.stringify(payload), { status, headers });
+}
 
 export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: defaultHeaders });
@@ -30,23 +48,23 @@ export async function onRequestPost(context) {
     try {
       data = await request.json();
     } catch (e) {
-      return new Response(JSON.stringify({ error: 'Malformed JSON payload.' }), { status: 400, headers: defaultHeaders });
+      return createResponse(false, null, { code: 'BAD_REQUEST', message: 'Malformed JSON payload.' }, context, 400);
     }
 
     if (!data || typeof data !== 'object') {
-      return new Response(JSON.stringify({ error: 'Invalid payload.' }), { status: 400, headers: defaultHeaders });
+      return createResponse(false, null, { code: 'BAD_REQUEST', message: 'Invalid payload.' }, context, 400);
     }
 
     const { task_id, decision, source_app, action_payload, comment } = data;
 
     if (!task_id || !decision) {
-      return new Response(JSON.stringify({ error: 'Missing required fields: task_id, decision' }), { status: 400, headers: defaultHeaders });
+      return createResponse(false, null, { code: 'BAD_REQUEST', message: 'Missing required fields: task_id, decision' }, context, 400);
     }
 
     if (env && env.ARC_STATE) {
       const kvState = await env.ARC_STATE.get('emergency_halt');
       if (kvState === 'true') {
-         return new Response(JSON.stringify({ error: 'System is halted.' }), { status: 503, headers: defaultHeaders });
+         return createResponse(false, null, { code: 'SERVICE_UNAVAILABLE', message: 'System is halted.' }, context, 503);
       }
     }
 
@@ -69,10 +87,8 @@ export async function onRequestPost(context) {
        console.error("Downstream fetch failed:", fetchErr);
     }
 
-    return new Response(JSON.stringify({ success: true, task_id }), {
-      headers: defaultHeaders
-    });
+    return createResponse(true, { task_id }, null, context, 200);
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: defaultHeaders });
+    return createResponse(false, null, { code: 'INTERNAL_ERROR', message: err.message }, context, 500);
   }
 }
