@@ -95,12 +95,16 @@ export async function resolveBulkActions({
   comment = '',
   previewMode,
   onProgress,
-  retryAttempt = 0
+  retryAttempt = 0,
+  currentQueue = []
 }) {
+  const rollbackQueue = [...currentQueue]; // Local rollback state
+
   if (!items.length) {
     return {
       resolvedIds: [],
-      failedItems: []
+      failedItems: [],
+      rollbackQueue
     };
   }
 
@@ -116,11 +120,13 @@ export async function resolveBulkActions({
 
     return {
       resolvedIds: items.map((item) => item.id),
-      failedItems: []
+      failedItems: [],
+      rollbackQueue
     };
   }
 
   let completed = 0;
+  let hasNetworkError = false;
 
   const results = await Promise.all(
     items.map(async (item) => {
@@ -130,6 +136,10 @@ export async function resolveBulkActions({
         comment,
         retryAttempt
       );
+
+      if (result.status === 'rejected' && result.error.message.includes('reject')) {
+          hasNetworkError = true;
+      }
 
       completed += 1;
       onProgress?.({
@@ -144,5 +154,8 @@ export async function resolveBulkActions({
     })
   );
 
-  return buildResult(results);
+  const finalResult = buildResult(results);
+  finalResult.rollbackQueue = rollbackQueue;
+  finalResult.hasNetworkError = hasNetworkError;
+  return finalResult;
 }
