@@ -98,13 +98,22 @@ function CircuitBreakerRecoveryModal({
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          service_key: selected.service_key,
-          halt: false,
+          service: selected.service_key,
+          action: 'recover',
           reason: 'Executive circuit breaker recovery from ARC'
         })
       });
 
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+          const data = await response.json();
+          if (data.fallbackMode || data.error?.fallback) {
+              throw new TypeError('Failed to fetch');
+          }
+      }
+
       if (!response.ok) {
+        if (response.status === 404) throw new TypeError('Failed to fetch');
         throw new Error('The edge rejected the recovery request.');
       }
 

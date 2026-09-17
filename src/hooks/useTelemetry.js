@@ -152,12 +152,47 @@ export function useTelemetry(previewMode = false) {
     };
   }, [previewMode]);
 
+
+  const pingNode = async (url) => {
+      const start = Date.now();
+      try {
+          const res = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+          return Date.now() - start;
+      } catch (e) {
+          return null; // unreachable
+      }
+  };
+
+  const pingAll = useCallback(async () => {
+       const [core, adt, onyx, edge] = await Promise.all([
+           pingNode('https://core.axim.us.com'),
+           pingNode('https://support.axim.us.com'), // representing ADT
+           pingNode('https://onyx.axim.us.com'),
+           pingNode('/api/remote/telemetry/edge')
+       ]);
+
+       setPulses(prev => ({
+           ...prev,
+           core: core,
+           adt: adt,
+           onyx: onyx,
+           edge: edge
+       }));
+  }, []);
+
+  useEffect(() => {
+     let interval = setInterval(pingAll, 15000);
+     pingAll();
+     return () => clearInterval(interval);
+  }, [pingAll]);
+
   return {
     metrics,
     pulses,
     edgeFingerprint,
     loading,
     connectionStatus,
-    isPreviewData: previewMode
+    isPreviewData: previewMode,
+    pingAll
   };
 }

@@ -109,6 +109,14 @@ function VoiceCommandButton({ disabled, onRecording, onError }) {
          detail: { message: msg, tone: 'error' }
       }));
 
+      // Auto-focus the text input if permission denied
+      if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+          setTimeout(() => {
+              const input = document.querySelector('input[aria-label="Onyx command input"]');
+              if (input) input.focus();
+          }, 100);
+      }
+
       setTimeout(() => setMicState('idle'), 2000);
     }
   };

@@ -51,7 +51,7 @@ export async function onRequestPost(context) {
         return createResponse(false, null, { code: 'BAD_REQUEST', message: 'Missing required fields: action, service' }, context, 400);
     }
 
-    if (env.ARC_STATE) {
+    if (env && env.ARC_STATE) {
         if (service === 'global') {
             await env.ARC_STATE.put('emergency_halt', action === 'halt' ? 'true' : 'false');
         } else {
@@ -61,6 +61,6 @@ export async function onRequestPost(context) {
 
     return createResponse(true, null, null, context, 200);
   } catch (err) {
-    return createResponse(false, null, { code: 'INTERNAL_ERROR', message: err.message }, context, 500);
+    return createResponse(false, null, { code: 'INTERNAL_ERROR', message: err.message, fallback: true }, context, 500);
   }
 }

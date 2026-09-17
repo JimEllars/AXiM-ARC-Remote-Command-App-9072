@@ -83,13 +83,22 @@ function CircuitBreakerModal({
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          service_key: selected.service_key,
-          halt: true,
+          service: selected.service_key,
+          action: 'halt',
           reason: `Executive ${selected.label} halt from ARC`
         })
       });
 
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+          const data = await response.json();
+          if (data.fallbackMode || data.error?.fallback) {
+              throw new TypeError('Failed to fetch');
+          }
+      }
+
       if (!response.ok) {
+        if (response.status === 404) throw new TypeError('Failed to fetch');
         throw new Error('Circuit breaker request failed.');
       }
 

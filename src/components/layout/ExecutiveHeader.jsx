@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
+import { isPasskeySupported } from '../../services/passkeyService';
 
-const { FiBell, FiBellOff, FiPower, FiRadio, FiRefreshCw } = FiIcons;
+const { FiBell, FiBellOff, FiPower, FiRadio, FiRefreshCw, FiKey } = FiIcons;
 
 function ExecutiveHeader({
   queueCount,
@@ -26,6 +27,8 @@ function ExecutiveHeader({
     }
   };
 
+  const isSsoSession = sessionStorage.getItem('arc_sso_session') !== null;
+
   return (
     <header className="executive-header">
       <div className="header-brand">
@@ -37,6 +40,21 @@ function ExecutiveHeader({
       </div>
 
       <div className="header-actions">
+        {isSsoSession && isPasskeySupported() && (
+           <button
+            type="button"
+            className="icon-button"
+            title="Link Biometric Passkey"
+            aria-label="Link Biometric Passkey"
+            onClick={() => {
+                window.dispatchEvent(new CustomEvent('arc-toast', {
+                   detail: { message: 'Biometric link requested. Navigate to Passport to register device.', tone: 'info' }
+                }));
+            }}
+          >
+            <SafeIcon icon={FiKey} />
+          </button>
+        )}
         <button
           type="button"
           className={`icon-button ${pushEnabled ? 'active' : ''}`}
