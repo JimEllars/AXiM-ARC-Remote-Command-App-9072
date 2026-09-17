@@ -11,6 +11,7 @@ function StreamingTerminal({ onyx, previewMode }) {
   const [prompt, setPrompt] = useState('');
   const terminalRef = useRef(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   const scrollToBottom = useCallback(() => {
     if (terminalRef.current) {
@@ -42,7 +43,30 @@ function StreamingTerminal({ onyx, previewMode }) {
     event.preventDefault();
     onyx.dispatchPrompt(prompt);
     setPrompt('');
+    setHistoryIndex(-1);
     setAutoScroll(true);
+  };
+
+  const handleKeyDown = (event) => {
+    if (onyx.history.length === 0) return;
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      const nextIndex = historyIndex < onyx.history.length - 1 ? historyIndex + 1 : historyIndex;
+      setHistoryIndex(nextIndex);
+      if (nextIndex >= 0 && nextIndex < onyx.history.length) {
+          setPrompt(onyx.history[nextIndex].prompt);
+      }
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      const prevIndex = historyIndex > -1 ? historyIndex - 1 : -1;
+      setHistoryIndex(prevIndex);
+      if (prevIndex === -1) {
+          setPrompt('');
+      } else {
+          setPrompt(onyx.history[prevIndex].prompt);
+      }
+    }
   };
 
   const handleTemplate = (template) => {
@@ -116,7 +140,8 @@ function StreamingTerminal({ onyx, previewMode }) {
           <input
             type="text"
             value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
+            onChange={(event) => { setPrompt(event.target.value); setHistoryIndex(-1); }}
+            onKeyDown={handleKeyDown}
             placeholder="Instruct Onyx..."
             disabled={onyx.isStreaming || onyx.isTranscribing}
             autoComplete="off"

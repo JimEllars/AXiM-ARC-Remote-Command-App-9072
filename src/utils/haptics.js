@@ -1,5 +1,5 @@
 export function triggerHaptic(type) {
-  if (!navigator.vibrate) return;
+  if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
 
   try {
     switch (type) {

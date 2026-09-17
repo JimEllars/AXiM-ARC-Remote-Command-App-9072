@@ -3,15 +3,18 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import SystemHealthDrilldown from './SystemHealthDrilldown';
 
-const { FiCloud, FiCpu, FiDatabase, FiMapPin } = FiIcons;
+import { triggerHaptic } from '../../utils/haptics';
+
+const { FiCloud, FiCpu, FiDatabase, FiMapPin, FiActivity, FiRefreshCw } = FiIcons;
 
 const services = [
   { key: 'edge', label: 'Cloudflare Edge', icon: FiCloud },
-  { key: 'database', label: 'Supabase Vault', icon: FiDatabase },
-  { key: 'onyx', label: 'Onyx Bridge', icon: FiCpu }
+  { key: 'core', label: 'AXiM Core API', icon: FiDatabase },
+  { key: 'adt', label: 'ADT Lead Routing', icon: FiActivity },
+  { key: 'onyx', label: 'Onyx Action Node', icon: FiCpu }
 ];
 
-function InfrastructurePulse({ pulses, previewMode, edgeFingerprint }) {
+function InfrastructurePulse({ pulses, previewMode, edgeFingerprint, onPingAll }) {
   const [selectedService, setSelectedService] = useState(null);
 
   const popLabel = edgeFingerprint ? `${edgeFingerprint.colo}-Edge` : (previewMode ? 'Local-Edge' : 'Connecting...');
@@ -27,7 +30,19 @@ function InfrastructurePulse({ pulses, previewMode, edgeFingerprint }) {
               <SafeIcon icon={FiMapPin} /> {popLabel}
             </p>
           </div>
-          <span className="status-pill"><i /> Operational</span>
+
+          <button
+             type="button"
+             className="status-pill pulse-trigger"
+             style={{cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)'}}
+             onClick={(e) => {
+                 e.stopPropagation();
+                 triggerHaptic('light');
+                 if (onPingAll) onPingAll();
+             }}
+          >
+             <SafeIcon icon={FiRefreshCw} /> Ping All
+          </button>
         </div>
 
         <div className="pulse-list">
@@ -45,7 +60,7 @@ function InfrastructurePulse({ pulses, previewMode, edgeFingerprint }) {
                 <SafeIcon icon={service.icon} />
                 <span>{service.label}</span>
                 <b>{latency === null ? '—' : `${latency} ms`}</b>
-                <i className={latency === null ? 'offline' : ''} />
+                <i className={latency === null ? 'offline' : latency > 750 ? 'offline' : latency > 200 ? 'degraded' : 'operational'} style={{ background: latency === null || latency > 750 ? 'var(--red)' : latency > 200 ? 'var(--yellow)' : 'var(--green)' }} />
               </button>
             );
           })}

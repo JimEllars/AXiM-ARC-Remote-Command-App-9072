@@ -70,4 +70,6 @@
   border: 1px solid var(--line);
   background: transparent;
   color: #7f899d;
+}.hitl-bulk-toolbar {
+    padding-bottom: calc(7px + env(safe-area-inset-bottom, 16px));
 }

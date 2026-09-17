@@ -141,9 +141,22 @@ function AppShell({ previewMode, onExitPreview }) {
         body: JSON.stringify(payload)
       });
 
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+          const data = await response.json();
+          if (data.fallbackMode || data.error?.fallback) {
+              // Simulate network failure to trigger local demo fallback
+              throw new Error('Failed to fetch');
+          }
+      }
+
       if (!response.ok) {
         if (response.status === 409) {
            throw new Error('409 Conflict: The action was already modified.');
+        }
+        if (response.status === 404) {
+           // Assume Vite HTML fallback for missing function
+           throw new Error('Failed to fetch');
         }
         throw new Error('The edge service rejected this action.');
       }
@@ -318,7 +331,7 @@ function AppShell({ previewMode, onExitPreview }) {
   };
 
   return (
-    <div className="app-shell" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))", paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
+    <div className="app-shell" style={{ minHeight: "100dvh", paddingBottom: "max(1rem, env(safe-area-inset-bottom))", paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
       {previewMode && (
         <div className="preview-banner">
           <SafeIcon icon={FiEye} />
@@ -371,6 +384,7 @@ function AppShell({ previewMode, onExitPreview }) {
               edgeFingerprint={telemetry.edgeFingerprint}
               pulses={telemetry.pulses}
               previewMode={previewMode}
+              onPingAll={telemetry.pingAll}
             />
             <button
               className="queue-callout"

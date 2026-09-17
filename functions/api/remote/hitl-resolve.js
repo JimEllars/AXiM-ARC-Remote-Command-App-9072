@@ -42,6 +42,10 @@ export async function onRequestOptions() {
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {
+    if (!env || (!env.ARC_STATE && !env.SUPABASE_SERVICE_ROLE_KEY)) {
+        return createResponse(false, null, { code: 'CONFIGURATION_UNAVAILABLE', message: 'Configuration unavailable', fallback: true }, context, 503);
+    }
+
     const signature = request.headers.get('X-Axim-Signature');
 
     let data;
@@ -64,7 +68,7 @@ export async function onRequestPost(context) {
     if (env && env.ARC_STATE) {
       const kvState = await env.ARC_STATE.get('emergency_halt');
       if (kvState === 'true') {
-         return createResponse(false, null, { code: 'SERVICE_UNAVAILABLE', message: 'System is halted.' }, context, 503);
+         return createResponse(false, null, { code: 'SERVICE_UNAVAILABLE', message: 'System is halted.', fallback: true }, context, 503);
       }
     }
 
@@ -89,6 +93,6 @@ export async function onRequestPost(context) {
 
     return createResponse(true, { task_id }, null, context, 200);
   } catch (err) {
-    return createResponse(false, null, { code: 'INTERNAL_ERROR', message: err.message }, context, 500);
+    return createResponse(false, null, { code: 'INTERNAL_ERROR', message: err.message, fallback: true }, context, 500);
   }
 }
